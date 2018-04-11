@@ -1,0 +1,307 @@
+<!doctype html>
+
+
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+
+  <title>Nacho Item Modal</title>
+  <meta name="description" content="Nacho Modal">
+  <meta name="author" content="jrobb">
+
+  <link rel="stylesheet" href="css/styles.css">
+  <link href="css/prism.css" rel="stylesheet" />
+
+  <!--[if lt IE 9]>
+  <script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+  <![endif]-->
+</head>
+
+<body style="font-family: fantasy; width: 1250px; margin: 0 auto 40px; ">
+  <h1>Nacho Item Modal</h1>
+  <em>Created and tested in Koha 17.05.09 in Firefox</em>
+  <h2>Problem:</h2>
+  <p>A patron at Library A borrows and loses an item owned by Library B. Library A charges their patron for the item, but neglects to provide reimbursement or replacement for the item to Library B.</p>
+  <h2>Solution:</h2>
+  <p>When an item that is owned by another library is marked lost, interrupt the process with a warning and the opportunity to print a reminder/invoice.</p>
+<iframe width="560" height="315" src="https://www.youtube.com/embed/e1tmEg17bnw?rel=0" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen style="display: block; margin:0 auto;"></iframe>
+  <h2>Breakdown:</h2>
+  <h3>IntranetUserJS</h3>
+  <ol>
+    <li>Retrieve info from the page and store in variables</li>
+    <li>Build HTML components (modal, printable div)</li>
+    <li>Input variables into HTML</li>
+    <li>Add conditions for activating the code</li>
+    <li>Add functionality to the buttons</li>
+  </ol>
+  <h3>IntranetUserCSS</h3>
+  <ol>
+    <li>Set glowing rules for various browsers</li>
+    <li>Assign glowing rules to a specific class</li>
+  </ol>
+  <h2>JS</h2>
+  <h4>Retrieve info from the page and store in variables</h4>
+  <p>Each variable is pulled from the page and used either on the modal itself, or on the print dialog that opens. Variables include the current date, home library of the item, holding library of the item, replacement cost, title, barcode, and the currently
+    logged in user’s name.</p>
+  <img src="img/variables.png" alt="variables" style="display: block; margin:0 auto;">
+  <pre><code class="language-js">var reimburseCurDate = $.datepicker.formatDate('mm/dd/yy', new Date());
+var reimburseHomeLib = $("#catalog_moredetail .bibliodetails:eq(1) > li").first().contents().filter(function() {
+  return this.nodeType == 3;
+}).text();
+var reimburseHoldingLib = $("#catalog_moredetail .bibliodetails:eq(2) > li").first().contents().filter(function() {
+  return this.nodeType == 3;
+}).text();
+var reimburseCost = $("#catalog_moredetail .bibliodetails:eq(1) > li").last().contents().filter(function() {
+  return this.nodeType == 3;
+}).text();
+var reimburseTitle = $("#catalog_moredetail #catalogue_detail_biblio h2").text();
+var reimburseBarcode = $("#catalog_moredetail #catalogue_detail_biblio h3").text();
+var loggedUser = $(".loggedinusername").text();</code></pre>
+  <h4>Build HTML components</h4>
+  <p>HTML is built in multiple htmlStr lines to make it easier to read and modify. This code creates a modal using existing classes so styles will match existing modals in Koha. Aside from the modal, a hidden div is created to produce the printable reminder.
+    Classes are assigned to components that will be filled with variable data.</p>
+  <pre><code class="language-js">htmlStr = '&lt;div id="reimburseModal" class="modal fade in"&gt;';
+  htmlStr += '&lt;div class="modal-dialog"&gt;';
+  htmlStr += '&lt;div class="modal-content"&gt;';
+  htmlStr += '&lt;form class="confirm"&gt;';
+  htmlStr += '&lt;div class="modal-header"&gt;';
+  htmlStr += '&lt;h2&gt;Wait! This is &lt;u&gt;not&lt;/u&gt; your item!&lt;/h2&gt;';
+  htmlStr += '&lt;/div&gt;';
+  htmlStr += '&lt;div class="modal-body"&gt;';
+  htmlStr += '&lt;p&gt;This item belongs to&lt;b&gt;&lt;span class="reimburseHomeLib"&gt;&lt;/span&gt;&lt;/b&gt;&lt;/p&gt;';
+  htmlStr += '&lt;p&gt;By marking this item lost, you agree to replace at full replacement cost: &lt;span class="reimburseCost"&gt;&lt;/span&gt;&lt;/p&gt;';
+  htmlStr += '&lt;/div&gt;';
+  htmlStr += '&lt;div id="reimburseReminder" style="display:none;"&gt;';
+  htmlStr += '&lt;h3&gt;Notice of Reimbursement&lt;/h3&gt;';
+  htmlStr += '&lt;hr&gt;';
+  htmlStr += '&lt;p&gt;Date: &lt;span class="reimburseCurDate"&gt;&lt;/span&gt;&lt;/p&gt;';
+  htmlStr += '&lt;p&gt;This notice acts as a reminder for &lt;span class="reimburseHoldingLib"&gt;&lt;/span&gt;to reimburse &lt;span class="reimburseHomeLib" style="font-weight:bold;"&gt;&lt;/span&gt;in the amount of &lt;span class="reimburseCost" style="font-weight: bold;"&gt;&lt;/span&gt;for &lt;span class="reimburseTitle" style="text-decoration: underline;"&gt;&lt;/span&gt; ( &lt;span class="reimburseBarcode"&gt;&lt;/span&gt;).&lt;/p&gt;';
+  htmlStr += '&lt;p style="font-style: italic;"&gt;Managed by: &lt;span class="loggedUser"&gt;&lt;/span&gt;&lt;/p&gt;';
+  htmlStr += '&lt;hr&gt;';
+  htmlStr += '&lt;/div&gt;';
+  htmlStr += '&lt;div class="modal-footer"&gt;';
+  htmlStr += '&lt;a id="printReminder" class="btn btn-default print"&gt;';
+  htmlStr += '&lt;i class="fa fa-print"&gt;&lt;/i&gt; Print a reminder&lt;/a&gt;';
+  htmlStr += '&lt;a id="closeReimburseModal" aria-hidden="true" type="submit" class="btn btn-danger deny"&gt;Close&lt;/a&gt;';
+  htmlStr += '&lt;/div&gt;';
+  htmlStr += '&lt;/form&gt;';
+  htmlStr += '&lt;/div&gt;';
+  htmlStr += '&lt;/div&gt;';
+  htmlStr += '&lt;/div&gt;';
+  htmlStr += '&lt;div class="modal-backdrop fade in" style="display:none;"&gt;&lt;/div&gt;';
+
+  $("#catalogue_detail_biblio").append(htmlStr);</code></pre>
+  <h4>Input Variables into HTML</h4>
+  <p>The classes assigned in the HTML above are used to insert the data stored in the earlier defined variables.</p>
+  <pre><code class="language-js">  $(".reimburseCurDate").html(reimburseCurDate);
+  $(".reimburseHomeLib").html(reimburseHomeLib);
+  $(".reimburseHoldingLib").html(reimburseHoldingLib);
+  $(".reimburseCost").html(reimburseCost);
+  $(".reimburseTitle").html(reimburseTitle);
+  $(".reimburseBarcode").html(reimburseBarcode);
+  $(".loggedUser").html(loggedUser);</code></pre>
+  <h4>Add conditions for activating the code</h4>
+  <p>Two conditions must be met before the code activates. First, the url must contain “itemnumber=” to ensure that only one item is displayed on the screen and all variables retrieved are accurate to that item. Second, the home library of the item must
+    not match the current location of the item. If both criteria are met, then the onchange function is allowed to fire – whenever the value of the lost item dropdown changes to something other than 0, the modal will reveal.</p>
+  <pre><code class="language-js">  //Determine if owner differs from holder
+  if ((window.location.href.indexOf("itemnumber=") > -1) && (reimburseHomeLib != reimburseHoldingLib)) { //only trigger if a single item is selected, and item home library does not match current library
+    $("select[name=itemlost]").change(function() {
+      if ($(this).val() != "0") { //trigger when the item lost dropdown is changed to a value other than 'blank'
+        $("#reimburseModal").css("display", "block"); //pop up modal
+        $(".modal-backdrop").css("display", "block"); //pop up modal backdrop
+      }
+    });
+  }</code></pre>
+  <h4>Add functionality to buttons</h4>
+  <p>The buttons need to know how to behave.</p>
+  <p>For the “Print” button, the following functionality was added:</p>
+  <ul>
+    <li>Open a new window</li>
+    <li>Populate the window with data from the aforementioned hidden div</li>
+    <li>Open the print dialog</li>
+    <li>Close the print window after printing</li>
+    <li>Close the modal and modal backdrop after printing</li>
+    <li>Add a ‘glow’ class to the ‘set status’ button after printing</li>
+  </ul>
+  <pre><code class="language-js">  //Print reminder button
+  $("#printReminder").click(function() {
+    w = window.open(); //open print window when button is clicked
+    w.document.write($('#reimburseReminder').html()); //capture only data in the reiminder div
+    w.print(); //open print dialog
+    w.close(); //close print window after printing/closing print dialog
+    $("#reimburseModal").css("display", "none"); //close the modal when print button is clicked
+    $(".modal-backdrop").css("display", "none"); //remove backdrop when print button is clicked
+    $("#catalog_moredetail input[value='Set status']").first().addClass("buttonglow"); //emphasize set status button
+  });</code></pre>
+  <p>For the “Close” button, the following functionality was added:</p>
+  <ul>
+    <li>Close the modal and modal backdrop</li>
+    <li>Add a ‘glow’ class to the ‘set status’ button</li>
+  </ul>
+  <pre><code class="language-js">  //Close button
+  $("#closeReimburseModal").click(function() {
+    $("#reimburseModal").css("display", "none"); //close modal when close button is clicked
+    $(".modal-backdrop").css("display", "none"); //close backdrop when close button is clicked
+    $("#catalog_moredetail input[value='Set status']").first().addClass("buttonglow"); //emphasize set status button
+  });
+});</code></pre>
+  <h2>CSS</h2>
+  <h4>Set glowing rules for various browsers</h4>
+  <pre><code class="language-css">@-webkit-keyframes glowing {
+  0% { background-color: #B20000; -webkit-box-shadow: 0 0 3px #B20000; }
+  50% { background-color: #FF0000; -webkit-box-shadow: 0 0 40px #FF0000; }
+  100% { background-color: #B20000; -webkit-box-shadow: 0 0 3px #B20000; }
+}
+
+@-moz-keyframes glowing {
+  0% { background-color: #B20000; -moz-box-shadow: 0 0 3px #B20000; }
+  50% { background-color: #FF0000; -moz-box-shadow: 0 0 40px #FF0000; }
+  100% { background-color: #B20000; -moz-box-shadow: 0 0 3px #B20000; }
+}
+
+@-o-keyframes glowing {
+  0% { background-color: #B20000; box-shadow: 0 0 3px #B20000; }
+  50% { background-color: #FF0000; box-shadow: 0 0 40px #FF0000; }
+  100% { background-color: #B20000; box-shadow: 0 0 3px #B20000; }
+}
+
+@keyframes glowing {
+  0% { background-color: #B20000; box-shadow: 0 0 3px #B20000; }
+  50% { background-color: #FF0000; box-shadow: 0 0 40px #FF0000; }
+  100% { background-color: #B20000; box-shadow: 0 0 3px #B20000; }
+}</code></pre>
+  <h4>Add the glow to a certain class</h4>
+  <pre><code class="language-css">.buttonglow {
+  -webkit-animation: glowing 1500ms infinite;
+  -moz-animation: glowing 1500ms infinite;
+  -o-animation: glowing 1500ms infinite;
+  animation: glowing 1500ms infinite;
+}
+</code></pre>
+  <h2>Complete Code:</h2>
+  <h3>IntranetUserJS</h3>
+  <pre><code class="language-js">//Nacho Item Modal
+$(document).ready(function() {
+  //Get variables to populate modal and print reminder
+  var reimburseCurDate = $.datepicker.formatDate('mm/dd/yy', new Date());
+  var reimburseHomeLib = $("#catalog_moredetail .bibliodetails:eq(1) > li").first().contents().filter(function() {
+    return this.nodeType == 3;
+  }).text();
+  var reimburseHoldingLib = $("#catalog_moredetail .bibliodetails:eq(2) > li").first().contents().filter(function() {
+    return this.nodeType == 3;
+  }).text();
+  var reimburseCost = $("#catalog_moredetail .bibliodetails:eq(1) > li").last().contents().filter(function() {
+    return this.nodeType == 3;
+  }).text();
+  var reimburseTitle = $("#catalog_moredetail #catalogue_detail_biblio h2").text();
+  var reimburseBarcode = $("#catalog_moredetail #catalogue_detail_biblio h3").text();
+  var loggedUser = $(".loggedinusername").text();
+
+  //Generate html for the modal and print notice
+  &lt;div id="reimburseModal" class="modal fade in"&gt;';
+  htmlStr += '&lt;div class="modal-dialog"&gt;';
+  htmlStr += '&lt;div class="modal-content"&gt;';
+  htmlStr += '&lt;form class="confirm"&gt;';
+  htmlStr += '&lt;div class="modal-header"&gt;';
+  htmlStr += '&lt;h2&gt;Wait! This is &lt;u&gt;not&lt;/u&gt; your item!&lt;/h2&gt;';
+  htmlStr += '&lt;/div&gt;';
+  htmlStr += '&lt;div class="modal-body"&gt;';
+  htmlStr += '&lt;p&gt;This item belongs to&lt;b&gt;&lt;span class="reimburseHomeLib"&gt;&lt;/span&gt;&lt;/b&gt;&lt;/p&gt;';
+  htmlStr += '&lt;p&gt;By marking this item lost, you agree to replace at full replacement cost: &lt;span class="reimburseCost"&gt;&lt;/span&gt;&lt;/p&gt;';
+  htmlStr += '&lt;/div&gt;';
+  htmlStr += '&lt;div id="reimburseReminder" style="display:none;"&gt;';
+  htmlStr += '&lt;h3&gt;Notice of Reimbursement&lt;/h3&gt;';
+  htmlStr += '&lt;hr&gt;';
+  htmlStr += '&lt;p&gt;Date: &lt;span class="reimburseCurDate"&gt;&lt;/span&gt;&lt;/p&gt;';
+  htmlStr += '&lt;p&gt;This notice acts as a reminder for &lt;span class="reimburseHoldingLib"&gt;&lt;/span&gt;to reimburse &lt;span class="reimburseHomeLib" style="font-weight:bold;"&gt;&lt;/span&gt;in the amount of &lt;span class="reimburseCost" style="font-weight: bold;"&gt;&lt;/span&gt;for &lt;span class="reimburseTitle" style="text-decoration: underline;"&gt;&lt;/span&gt; ( &lt;span class="reimburseBarcode"&gt;&lt;/span&gt;).&lt;/p&gt;';
+  htmlStr += '&lt;p style="font-style: italic;"&gt;Managed by: &lt;span class="loggedUser"&gt;&lt;/span&gt;&lt;/p&gt;';
+  htmlStr += '&lt;hr&gt;';
+  htmlStr += '&lt;/div&gt;';
+  htmlStr += '&lt;div class="modal-footer"&gt;';
+  htmlStr += '&lt;a id="printReminder" class="btn btn-default print"&gt;';
+  htmlStr += '&lt;i class="fa fa-print"&gt;&lt;/i&gt; Print a reminder&lt;/a&gt;';
+  htmlStr += '&lt;a id="closeReimburseModal" aria-hidden="true" type="submit" class="btn btn-danger deny"&gt;Close&lt;/a&gt;';
+  htmlStr += '&lt;/div&gt;';
+  htmlStr += '&lt;/form&gt;';
+  htmlStr += '&lt;/div&gt;';
+  htmlStr += '&lt;/div&gt;';
+  htmlStr += '&lt;/div&gt;';
+  htmlStr += '&lt;div class="modal-backdrop fade in" style="display:none;"&gt;&lt;/div&gt;';
+
+  //Add HTML to the appropriate page
+  $("#catalogue_detail_biblio").append(htmlStr);
+
+  //Input variables into html
+  $(".reimburseCurDate").html(reimburseCurDate);
+  $(".reimburseHomeLib").html(reimburseHomeLib);
+  $(".reimburseHoldingLib").html(reimburseHoldingLib);
+  $(".reimburseCost").html(reimburseCost);
+  $(".reimburseTitle").html(reimburseTitle);
+  $(".reimburseBarcode").html(reimburseBarcode);
+  $(".loggedUser").html(loggedUser);
+
+  //Determine if owner differs from holder
+  if ((window.location.href.indexOf("itemnumber=") > -1) && (reimburseHomeLib != reimburseHoldingLib)) { //only trigger if a single item is selected, and item home library does not match current library
+    $("select[name=itemlost]").change(function() {
+      if ($(this).val() != "0") { //trigger when the item lost dropdown is changed to a value other than 'blank'
+        $("#reimburseModal").css("display", "block"); //pop up modal
+        $(".modal-backdrop").css("display", "block"); //pop up modal backdrop
+      }
+    });
+  }
+
+  //Print reminder button
+  $("#printReminder").click(function() {
+    w = window.open(); //open print window when button is clicked
+    w.document.write($('#reimburseReminder').html()); //capture only data in the reiminder div
+    w.print(); //open print dialog
+    w.close(); //close print window after printing/closing print dialog
+    $("#reimburseModal").css("display", "none"); //close the modal when print button is clicked
+    $(".modal-backdrop").css("display", "none"); //remove backdrop when print button is clicked
+    $("#catalog_moredetail input[value='Set status']").first().addClass("buttonglow"); //emphasize set status button
+  });
+
+  //Close button
+  $("#closeReimburseModal").click(function() {
+    $("#reimburseModal").css("display", "none"); //close modal when close button is clicked
+    $(".modal-backdrop").css("display", "none"); //close backdrop when close button is clicked
+    $("#catalog_moredetail input[value='Set status']").first().addClass("buttonglow"); //emphasize set status button
+  });
+});
+</code></pre>
+  <h3>IntranetUserCSS</h3>
+  <pre><code class="language-css">@-webkit-keyframes glowing {
+  0% { background-color: #B20000; -webkit-box-shadow: 0 0 3px #B20000; }
+  50% { background-color: #FF0000; -webkit-box-shadow: 0 0 40px #FF0000; }
+  100% { background-color: #B20000; -webkit-box-shadow: 0 0 3px #B20000; }
+}
+
+@-moz-keyframes glowing {
+  0% { background-color: #B20000; -moz-box-shadow: 0 0 3px #B20000; }
+  50% { background-color: #FF0000; -moz-box-shadow: 0 0 40px #FF0000; }
+  100% { background-color: #B20000; -moz-box-shadow: 0 0 3px #B20000; }
+}
+
+@-o-keyframes glowing {
+  0% { background-color: #B20000; box-shadow: 0 0 3px #B20000; }
+  50% { background-color: #FF0000; box-shadow: 0 0 40px #FF0000; }
+  100% { background-color: #B20000; box-shadow: 0 0 3px #B20000; }
+}
+
+@keyframes glowing {
+  0% { background-color: #B20000; box-shadow: 0 0 3px #B20000; }
+  50% { background-color: #FF0000; box-shadow: 0 0 40px #FF0000; }
+  100% { background-color: #B20000; box-shadow: 0 0 3px #B20000; }
+}
+
+.buttonglow {
+  -webkit-animation: glowing 1500ms infinite;
+  -moz-animation: glowing 1500ms infinite;
+  -o-animation: glowing 1500ms infinite;
+  animation: glowing 1500ms infinite;
+}</code></pre>
+  <script src="js/prism.js"></script>
+</body>
+
+</html>
